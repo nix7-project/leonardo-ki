@@ -82,15 +82,50 @@
         }
 
         function speak(text) {
-            window.speechSynthesis.cancel();
-            const msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'de-DE';
-            
-            // iPad braucht oft einen kleinen Moment nach der Erkennung
-            setTimeout(() => {
-                window.speechSynthesis.speak(msg);
-            }, 200);
+    window.speechSynthesis.cancel();
+    
+    // Kleiner Delay für iOS Stabilität
+    setTimeout(() => {
+        const msg = new SpeechSynthesisUtterance(text);
+        const voices = window.speechSynthesis.getVoices();
+        
+        // PRIORITÄTEN-LISTE DER STIMMEN
+        // Wir suchen nacheinander nach diesen Begriffen im Namen
+        const preferredVoices = [
+            'Conrad',          // Windows/Chrome (Sehr gut, männlich)
+            'Kasper',          // iOS/Safari (Männlich, weise)
+            'Yannick',         // macOS/iOS
+            'Deutsch Deutschland', // Google Standard
+            'Male',            // Allgemeiner Filter
+            'Deutsch'          // Letzter Rettungsanker
+        ];
+
+        let selectedVoice = null;
+        
+        // Wir gehen die Prioritäten durch
+        for (let name of preferredVoices) {
+            selectedVoice = voices.find(v => v.name.includes(name) && v.lang.startsWith('de'));
+            if (selectedVoice) break;
         }
+
+        if (selectedVoice) {
+            msg.voice = selectedVoice;
+            console.log("Gewählte Stimme: " + selectedVoice.name);
+        }
+
+        msg.lang = 'de-DE';
+        msg.pitch = 0.85; // Etwas tiefer für Leonardo
+        msg.rate = 0.9;   // Etwas langsamer für mehr Würde
+        msg.volume = 1.0;
+
+        window.speechSynthesis.speak(msg);
+    }, 150);
+}
+
+// WICHTIG: Stimmen werden oft verzögert geladen
+window.speechSynthesis.onvoiceschanged = () => {
+    console.log("Stimmen aktualisiert:", window.speechSynthesis.getVoices().length);
+};
 
         micButton.addEventListener('click', () => {
             // WICHTIG FÜR IPAD: Audio beim allerersten Klick entsperren
