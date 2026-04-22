@@ -3,20 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Leonardo Museum Prototyp</title>
+    <title>Leonardo KI - Museum</title>
     <style>
         body { margin: 0; background-color: #000; display: flex; flex-direction: column; height: 100vh; color: #d4af37; font-family: 'Georgia', serif; overflow: hidden; }
+        
+        /* Lade-Anzeige */
+        #loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 65vh;
+            background: #000; display: flex; align-items: center; justify-content: center;
+            z-index: 10; font-style: italic; color: #d4af37;
+        }
+
         model-viewer { height: 65vh; width: 100%; background: #000; }
+        
         #ui-container { height: 35vh; background: #000; border-top: 1px solid #d4af37; display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; }
+        
         #status-text { font-style: italic; color: #888; font-size: 12px; margin-bottom: 5px; }
-        #mic-button { width: 70px; height: 70px; border-radius: 50%; border: 2px solid #d4af37; background: #1a1a1a; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; flex-shrink: 0; cursor: pointer; }
-        #mic-button.listening { background: #600; border-color: #f44; }
+        
+        #mic-button { 
+            width: 70px; height: 70px; border-radius: 50%; border: 2px solid #d4af37; 
+            background: #1a1a1a; display: flex; align-items: center; justify-content: center; 
+            margin-bottom: 10px; flex-shrink: 0; cursor: pointer;
+            outline: none !important; -webkit-tap-highlight-color: transparent;
+        }
+        
+        #mic-button.listening { background: #600; border-color: #f44; box-shadow: 0 0 15px #f44; }
+
         #transcript { font-size: 16px; color: #d4af37; text-align: center; width: 95%; height: 80px; overflow-y: auto; }
-        svg { fill: #d4af37; width: 32px; height: 32px; }
+        
+        svg { fill: #d4af37; width: 32px; height: 32px; pointer-events: none; }
     </style>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
+
+    <div id="loading-overlay">Leonardo erwacht...</div>
 
     <model-viewer id="leo" src="leonardo.glb" interaction-prompt="none" 
                   camera-target="0m 1.72m 0m" camera-orbit="0deg 90deg 0.35m" field-of-view="6deg">
@@ -34,61 +55,59 @@
         const micButton = document.getElementById('mic-button');
         const statusText = document.getElementById('status-text');
         const transcriptDiv = document.getElementById('transcript');
-        
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let recognition = new SpeechRecognition();
-        recognition.lang = 'de-DE';
+        const modelViewer = document.getElementById('leo');
+        const loadingOverlay = document.getElementById('loading-overlay');
 
-        recognition.onresult = (event) => {
-            const userText = event.results[0][0].transcript;
-            micButton.classList.remove('listening');
-            transcriptDiv.innerText = "Du: " + userText;
-            speak("Ich habe dich verstanden. Mein Geist ist bereit für deine Fragen.");
-        };
+        // Lade-Overlay entfernen, wenn Modell bereit
+        modelViewer.addEventListener('load', () => {
+            loadingOverlay.style.display = 'none';
+        });
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isAudioUnlocked = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'de-DE';
+
+            recognition.onresult = (event) => {
+                const userText = event.results[0][0].transcript;
+                transcriptDiv.innerText = "Du: " + userText;
+                speak("Ich habe dich verstanden. Mein Geist ist bereit.");
+            };
+
+            recognition.onend = () => { micButton.classList.remove('listening'); };
+            recognition.onerror = () => { micButton.classList.remove('listening'); };
+        }
 
         function speak(text) {
             window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'de-DE';
             
-            // --- TABLET WECK-LOGIK (Kostenlos) ---
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                gain.gain.value = 0.001; // Fast lautlos
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
-            } catch(e) { console.log("AudioContext blocked"); }
-
+            // iPad braucht oft einen kleinen Moment nach der Erkennung
             setTimeout(() => {
-                const msg = new SpeechSynthesisUtterance(text);
-                const voices = window.speechSynthesis.getVoices();
-                
-                // Stimme suchen (Conrad für PC, sonst männlich für Tablet)
-                let v = voices.find(v => v.name.includes('Conrad')) || 
-                        voices.find(v => v.lang.includes('de') && v.name.toLowerCase().includes('male')) ||
-                        voices.find(v => v.lang.includes('de'));
-
-                if(v) msg.voice = v;
-                msg.lang = 'de-DE';
-                msg.pitch = 0.95;
-                msg.rate = 0.9;
-
-                msg.onstart = () => { statusText.innerText = "Leonardo spricht..."; };
-                msg.onend = () => { statusText.innerText = "Bereit"; };
-                
                 window.speechSynthesis.speak(msg);
-            }, 100);
+            }, 200);
         }
 
         micButton.addEventListener('click', () => {
+            // WICHTIG FÜR IPAD: Audio beim allerersten Klick entsperren
+            if (!isAudioUnlocked) {
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+                isAudioUnlocked = true;
+            }
+            
             window.speechSynthesis.resume();
-            try {
-                recognition.start();
-                micButton.classList.add('listening');
-                statusText.innerText = "Ich höre...";
-            } catch (e) {}
+            
+            if (recognition) {
+                try {
+                    recognition.start();
+                    micButton.classList.add('listening');
+                    statusText.innerText = "Ich höre zu...";
+                } catch (e) {}
+            }
         });
     </script>
 </body>
