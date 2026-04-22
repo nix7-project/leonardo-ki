@@ -91,14 +91,16 @@
         
         // PRIORITÄTEN-LISTE DER STIMMEN
         // Wir suchen nacheinander nach diesen Begriffen im Namen
-        const preferredVoices = [
-            'Conrad',          // Windows/Chrome (Sehr gut, männlich)
-            'Kasper',          // iOS/Safari (Männlich, weise)
-            'Yannick',         // macOS/iOS
-            'Deutsch Deutschland', // Google Standard
-            'Male',            // Allgemeiner Filter
-            'Deutsch'          // Letzter Rettungsanker
-        ];
+       const preferredVoices = [
+    'Conrad',           // Windows/Chrome (Top)
+    'Markus',           // iOS/Safari (Beste männliche Apple Stimme)
+    'Kasper',           // iOS/Safari Alternative
+    'Stefan',           // Windows Alternative
+    'Google Deutsch',   // Android/Chrome Standard
+    'Deutsch Deutschland',
+    'Male',             // Sucht nach dem Schlagwort "männlich"
+    'de-DE'             // Notnagel
+];
 
         let selectedVoice = null;
         
