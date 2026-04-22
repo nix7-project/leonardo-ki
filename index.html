@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Leonardo Museum Prototyp</title>
+    <style>
+        body { margin: 0; background-color: #000; display: flex; flex-direction: column; height: 100vh; color: #d4af37; font-family: 'Georgia', serif; overflow: hidden; }
+        model-viewer { height: 65vh; width: 100%; background: #000; }
+        #ui-container { height: 35vh; background: #000; border-top: 1px solid #d4af37; display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; }
+        #status-text { font-style: italic; color: #888; font-size: 12px; margin-bottom: 5px; }
+        #mic-button { width: 70px; height: 70px; border-radius: 50%; border: 2px solid #d4af37; background: #1a1a1a; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; flex-shrink: 0; cursor: pointer; }
+        #mic-button.listening { background: #600; border-color: #f44; }
+        #transcript { font-size: 16px; color: #d4af37; text-align: center; width: 95%; height: 80px; overflow-y: auto; }
+        svg { fill: #d4af37; width: 32px; height: 32px; }
+    </style>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+</head>
+<body>
+
+    <model-viewer id="leo" src="leonardo.glb" interaction-prompt="none" 
+                  camera-target="0m 1.72m 0m" camera-orbit="0deg 90deg 0.35m" field-of-view="6deg">
+    </model-viewer>
+
+    <div id="ui-container">
+        <div id="status-text">Bereit</div>
+        <button id="mic-button">
+            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+        </button>
+        <div id="transcript">Tippe auf das Mikrofon...</div>
+    </div>
+
+    <script>
+        const micButton = document.getElementById('mic-button');
+        const statusText = document.getElementById('status-text');
+        const transcriptDiv = document.getElementById('transcript');
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = new SpeechRecognition();
+        recognition.lang = 'de-DE';
+
+        recognition.onresult = (event) => {
+            const userText = event.results[0][0].transcript;
+            micButton.classList.remove('listening');
+            transcriptDiv.innerText = "Du: " + userText;
+            speak("Ich habe dich verstanden. Mein Geist ist bereit für deine Fragen.");
+        };
+
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            
+            // --- TABLET WECK-LOGIK (Kostenlos) ---
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                gain.gain.value = 0.001; // Fast lautlos
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } catch(e) { console.log("AudioContext blocked"); }
+
+            setTimeout(() => {
+                const msg = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                
+                // Stimme suchen (Conrad für PC, sonst männlich für Tablet)
+                let v = voices.find(v => v.name.includes('Conrad')) || 
+                        voices.find(v => v.lang.includes('de') && v.name.toLowerCase().includes('male')) ||
+                        voices.find(v => v.lang.includes('de'));
+
+                if(v) msg.voice = v;
+                msg.lang = 'de-DE';
+                msg.pitch = 0.95;
+                msg.rate = 0.9;
+
+                msg.onstart = () => { statusText.innerText = "Leonardo spricht..."; };
+                msg.onend = () => { statusText.innerText = "Bereit"; };
+                
+                window.speechSynthesis.speak(msg);
+            }, 100);
+        }
+
+        micButton.addEventListener('click', () => {
+            window.speechSynthesis.resume();
+            try {
+                recognition.start();
+                micButton.classList.add('listening');
+                statusText.innerText = "Ich höre...";
+            } catch (e) {}
+        });
+    </script>
+</body>
+</html>
