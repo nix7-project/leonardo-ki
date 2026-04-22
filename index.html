@@ -58,79 +58,88 @@
         const modelViewer = document.getElementById('leo');
         const loadingOverlay = document.getElementById('loading-overlay');
 
-        // Lade-Overlay entfernen, wenn Modell bereit
+        let recognition = null;
+        let isAudioUnlocked = false;
+        let isThinking = false; // Sperrt den Button, während die KI arbeitet
+
+        // Lade-Overlay entfernen, sobald das 3D-Modell geladen ist
         modelViewer.addEventListener('load', () => {
             loadingOverlay.style.display = 'none';
         });
 
+        // Spracherkennung einrichten
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let recognition = null;
-        let isAudioUnlocked = false;
 
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.lang = 'de-DE';
 
             recognition.onresult = (event) => {
+                if (isThinking) return;
                 const userText = event.results[0][0].transcript;
                 transcriptDiv.innerText = "Du: " + userText;
-                speak("Ich habe dich verstanden. Mein Geist ist bereit.");
+                
+                // Hier rufen wir die KI-Logik auf
+                askLeonardo(userText);
             };
 
             recognition.onend = () => { micButton.classList.remove('listening'); };
             recognition.onerror = () => { micButton.classList.remove('listening'); };
         }
 
+        // --- DIE KI FUNKTION (HIER KOMMT SPÄTER MAIA.AI REIN) ---
+        async function askLeonardo(question) {
+            isThinking = true;
+            micButton.style.opacity = "0.3"; // Button visuell deaktivieren
+            statusText.innerText = "Leonardo denkt nach...";
+            
+            // 1. Kurze Zwischenantwort, damit keine peinliche Stille entsteht
+            speak("Einen Moment, ich suche in meinen Aufzeichnungen...");
+
+            // 2. SIMULATION der Wartezeit (Hier binden wir später die Maia-API an)
+            // Wir warten 3 Sekunden, um eine echte KI-Antwort zu simulieren
+            setTimeout(() => {
+                const answer = "Als Leonardo da Vinci fasziniert mich deine Frage zu '" + question + "'. Mein Geist arbeitet noch an der Vollendung dieser Antwort.";
+                
+                transcriptDiv.innerText = "Leonardo: " + answer;
+                speak(answer);
+                
+                // 3. Nach der Antwort alles wieder freischalten
+                isThinking = false;
+                micButton.style.opacity = "1";
+            }, 3500); 
+        }
+
+        // --- DIE SPRECH FUNKTION ---
         function speak(text) {
-    window.speechSynthesis.cancel();
-    
-    // Kleiner Delay für iOS Stabilität
-    setTimeout(() => {
-        const msg = new SpeechSynthesisUtterance(text);
-        const voices = window.speechSynthesis.getVoices();
-        
-        // PRIORITÄTEN-LISTE DER STIMMEN
-        // Wir suchen nacheinander nach diesen Begriffen im Namen
-       const preferredVoices = [
-    'Conrad',           // Windows/Chrome (Top)
-    'Markus',           // iOS/Safari (Beste männliche Apple Stimme)
-    'Kasper',           // iOS/Safari Alternative
-    'Stefan',           // Windows Alternative
-    'Google Deutsch',   // Android/Chrome Standard
-    'Deutsch Deutschland',
-    'Male',             // Sucht nach dem Schlagwort "männlich"
-    'de-DE'             // Notnagel
-];
-
-        let selectedVoice = null;
-        
-        // Wir gehen die Prioritäten durch
-        for (let name of preferredVoices) {
-            selectedVoice = voices.find(v => v.name.includes(name) && v.lang.startsWith('de'));
-            if (selectedVoice) break;
+            window.speechSynthesis.cancel();
+            
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'de-DE';
+            
+            // Stimmen-Suche (Markus für iPad, Conrad für PC)
+            const voices = window.speechSynthesis.getVoices();
+            let v = voices.find(v => v.name.includes('Markus')) || 
+                    voices.find(v => v.name.includes('Conrad')) || 
+                    voices.find(v => v.name.includes('Kasper')) ||
+                    voices.find(v => v.lang.includes('de') && v.name.toLowerCase().includes('male'));
+            
+            if(v) msg.voice = v;
+            
+            msg.pitch = 0.85; // Tiefer
+            msg.rate = 0.9;   // Langsamer
+            
+            // Kleiner Delay für iOS Stabilität
+            setTimeout(() => {
+                window.speechSynthesis.speak(msg);
+            }, 200);
         }
 
-        if (selectedVoice) {
-            msg.voice = selectedVoice;
-            console.log("Gewählte Stimme: " + selectedVoice.name);
-        }
-
-        msg.lang = 'de-DE';
-        msg.pitch = 0.85; // Etwas tiefer für Leonardo
-        msg.rate = 0.9;   // Etwas langsamer für mehr Würde
-        msg.volume = 1.0;
-
-        window.speechSynthesis.speak(msg);
-    }, 150);
-}
-
-// WICHTIG: Stimmen werden oft verzögert geladen
-window.speechSynthesis.onvoiceschanged = () => {
-    console.log("Stimmen aktualisiert:", window.speechSynthesis.getVoices().length);
-};
-
+        // --- DER BUTTON KLICK ---
         micButton.addEventListener('click', () => {
-            // WICHTIG FÜR IPAD: Audio beim allerersten Klick entsperren
+            if (isThinking) return; // Klick ignorieren, wenn er gerade denkt
+
+            // iPad Audio-Unlock beim ersten Mal
             if (!isAudioUnlocked) {
                 window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
                 isAudioUnlocked = true;
@@ -143,7 +152,10 @@ window.speechSynthesis.onvoiceschanged = () => {
                     recognition.start();
                     micButton.classList.add('listening');
                     statusText.innerText = "Ich höre zu...";
-                } catch (e) {}
+                    transcriptDiv.innerText = ""; // Altes löschen für neue Frage
+                } catch (e) {
+                    console.log("Erkennung läuft bereits");
+                }
             }
         });
     </script>
