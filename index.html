@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Leonardo KI - Museum Edition</title>
+    <title>Leonardo da Vinci</title>
     <style>
         body { 
             margin: 0; background-color: #000; display: flex; flex-direction: column; height: 100vh; 
@@ -67,7 +67,7 @@
     <div id="ui-container">
         <div id="status-text">Initialisiere...</div>
         
-        <div id="transcript">Willkommen im Museum. Bitte tippe auf das Mikrofon, um mit Leonardo da Vinci zu sprechen...</div>
+        <div id="transcript">Tippe auf das Mikrofon, um mit Leonardo da Vinci zu sprechen...</div>
 
         <div id="action-row">
             <button id="reset-button" class="museum-btn">Gespräch beenden</button>
@@ -101,21 +101,20 @@
         let letztesThema = "";
 
         document.addEventListener("DOMContentLoaded", async () => {
-            // Kompakter Text für das Personal
-            apiKey = prompt("API-Key eingeben:");
+            // Extrem reduzierter Prompt beim Laden der Seite
+            apiKey = prompt("Key eingeben:");
             
             if (!apiKey) {
-                alert("Fehler: Kein Key eingetragen.");
-                statusText.innerText = "Fehler: Kein API-Key.";
+                statusText.innerText = "Fehler: Kein Key.";
                 transcriptDiv.innerText = "Bitte Seite neu laden und Key eingeben.";
                 loadingOverlay.style.display = 'none';
                 return;
             }
 
-            statusText.innerText = "Lade Exponat-Wissen...";
+            statusText.innerText = "Lade Daten...";
             await ladeWissen();
             
-            statusText.innerText = "Bereit für Besucher";
+            statusText.innerText = "Bereit";
             setTimeout(() => { loadingOverlay.style.display = 'none'; }, 1000);
         });
 
@@ -138,6 +137,7 @@
             }
         }
 
+        // Stummes Zurücksetzen ohne ungefragten Begrüßungstext
         function resetConversation() {
             window.speechSynthesis.cancel();
             chatHistory = [];
@@ -145,9 +145,8 @@
             isThinking = false;
             micButton.style.opacity = "1";
             
-            statusText.innerText = "Bereit für neuen Besucher";
-            transcriptDiv.innerText = "Ich habe mein Gedächtnis erfrischt. Tippe auf das Mikrofon, um ein neues Gespräch mit mir zu beginnen.";
-            speak("Seid gegrüßt, mein Freund! Was führt Euch zu meinen Werken?");
+            statusText.innerText = "Bereit";
+            transcriptDiv.innerText = "Tippe auf das Mikrofon, um mit Leonardo da Vinci zu sprechen...";
         }
 
         resetButton.addEventListener('click', resetConversation);
@@ -200,54 +199,34 @@
             }
 
             try {
-                // Neuer, robusterer AllOrigins CORS-Proxy-Tunnel
-                const targetUrl = "https://api.anthropic.com/v1/messages";
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-                
-                const payload = {
-                    model: MODEL,
-                    max_tokens: MAXTOKENS,
-                    temperature: TEMP,
-                    system: `Du bist Leonardo da Vinci im Museum.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch.\n7. Moderne Themen abweisen.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich.\n9. Wiederhole dich möglichst wenig.\n10. Keine Aufzählungen außer nötig.\n11. Antworte vollständig abgeschlossen.`,
-                    messages: [
-                        ...chatHistory,
-                        {
-                            role: "user",
-                            content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}`
-                        }
-                    ]
-                };
-
-                const response = await fetch(proxyUrl, {
+                // Direkter, nativer API-Aufruf zu Anthropic unter Umgehung der künstlichen CORS-Sperre
+                const response = await fetch("https://api.anthropic.com/v1/messages", {
                     method: "POST",
-                    body: JSON.stringify(payload)
+                    headers: { 
+                        "Content-Type": "application/json", 
+                        "x-api-key": apiKey, 
+                        "anthropic-version": "2023-06-01", 
+                        "anthropic-dangerously-allow-browser": "true" 
+                    },
+                    body: JSON.stringify({
+                        model: MODEL,
+                        max_tokens: MAXTOKENS,
+                        temperature: TEMP,
+                        system: `Du bist Leonardo da Vinci.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch.\n7. Moderne Themen abweisen.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich.\n9. Wiederhole dich möglichst wenig.\n10. Keine Aufzählungen außer nötig.\n11. Antworte vollständig abgeschlossen.`,
+                        messages: [
+                            ...chatHistory,
+                            {
+                                role: "user",
+                                content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}`
+                            }
+                        ]
+                    })
                 });
 
-                // Falls POST über allorigins fehlschlägt, direkter Fallback (manche Proxies bevorzugen GET Wrapper)
-                let textData;
-                if (!response.ok) {
-                    throw new Error();
-                } else {
-                    const jsonWrapper = await response.json();
-                    // Wenn der Proxy es als GET-String verpackt hat
-                    textData = typeof jsonWrapper.contents === 'string' ? JSON.parse(jsonWrapper.contents) : jsonWrapper.contents;
-                }
-
-                // Wenn der Fallback greift oder allorigins direkt antwortet
-                let antwortRaw = textData?.content?.[0]?.text || textData?.contents?.content?.[0]?.text;
+                if (!response.ok) throw new Error(`API Status ${response.status}`);
+                const data = await response.json();
                 
-                // Letzte Sicherheitsstufe: Falls Proxy-Struktur variiert, direktes Fetch versuchen
-                if (!antwortRaw) {
-                    const directResp = await fetch("https://api.anthropic.com/v1/messages", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerously-allow-browser": "true" },
-                        body: JSON.stringify(payload)
-                    });
-                    const directJson = await directResp.json();
-                    antwortRaw = directJson.content[0].text;
-                }
-
-                let antwort = sauberesEnde(antwortRaw.trim());
+                let antwort = sauberesEnde(data.content[0].text.trim());
                 
                 chatHistory.push({ role: "user", content: question });
                 chatHistory.push({ role: "assistant", content: antwort });
@@ -260,13 +239,13 @@
 
             } catch (error) {
                 console.error("API-Fehler:", error);
-                transcriptDiv.innerText = "Verzeihung, mein Geist ist gerade blockiert. Bitte wende dich an das Museumspersonal.";
+                transcriptDiv.innerText = "Verzeihung, mein Geist ist gerade blockiert.";
                 speak("Verzeihung, mein Geist ist gerade blockiert.");
             }
 
             isThinking = false;
             micButton.style.opacity = "1";
-            statusText.innerText = "Bereit für Fragen";
+            statusText.innerText = "Bereit";
         }
 
         function speak(text) {
