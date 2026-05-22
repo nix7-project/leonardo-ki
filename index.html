@@ -60,14 +60,89 @@
 
         let recognition = null;
         let isAudioUnlocked = false;
-        let isThinking = false; // Sperrt den Button, während die KI arbeitet
+        let isThinking = false; 
 
-        // Lade-Overlay entfernen, sobald das 3D-Modell geladen ist
-        modelViewer.addEventListener('load', () => {
+        // --- KI ENGINES & SPEICHER (AUS PYTHON ÜBERTRAGEN) ---
+        const MODEL = "claude-haiku-4-5-20251001";
+        const TEMP = 0.15;
+        const MAXTOKENS = 220;
+        const HISTORY_LENGTH = 10;
+
+        let apiKey = "";
+        let leonardoWissen = "";
+        let chatHistory = [];
+        let letztesThema = "";
+
+        // Sobald das 3D-Modell bereit ist, starten wir die Initialisierung
+        modelViewer.addEventListener('load', async () => {
             loadingOverlay.style.display = 'none';
+            
+            // 1. API Key abfragen (Sichere Methode für statisches Frontend)
+            apiKey = prompt("Willkommen im Museum!\nBitte gib deinen Anthropic API-Key ein, um Leonardo zu aktivieren:");
+            if (!apiKey) {
+                alert("Fehler: Ohne API-Key kann Leonardo nicht antworten. Bitte lade die Seite neu.");
+                statusText.innerText = "Kein API-Key gesetzt.";
+                return;
+            }
+
+            // 2. Die 4 Textdateien direkt aus dem GitHub-Verzeichnis laden
+            statusText.innerText = "Lade Wissen...";
+            await ladeWissen();
+            statusText.innerText = "Bereit";
+            transcriptDiv.innerText = "Ich bin bereit. Tippe auf das Mikrofon und sprich mit mir...";
         });
 
-        // Spracherkennung einrichten
+        // --- FUNKTION: TEXTDATEIEN LADEN ---
+        async function ladeWissen() {
+            const dateien = ['Biografie.txt', 'Kunstwerke.txt', 'Erfindungen.txt', 'Arbeitsweise.txt'];
+            for (let datei of dateien) {
+                try {
+                    const response = await fetch(datei);
+                    if (!response.ok) throw new Error(`Status: ${response.status}`);
+                    const text = await response.text();
+                    
+                    // Name der Datei als Überschrift formatieren wie im Python Code
+                    const titel = datei.replace('.txt', '').toUpperCase();
+                    leonardoWissen += `=== ${titel} ===\n${text.trim()}\n\n`;
+                } catch (e) {
+                    console.error("Fehler beim Laden der Wissensdatei: " + datei, e);
+                }
+            }
+        }
+
+        // --- FUNKTION: FOLGEFRAGEN ERKENNEN ---
+        function istFolgefrage(frage) {
+            const text = frage.toLowerCase().trim();
+            const worte = text.split(/\s+/);
+            
+            const trigger = [
+                "das", "dafür", "darauf", "wann", "wie lange", "wie viel", 
+                "warum", "wo", "wer", "wie", "und", "danach", "dann", 
+                "wirklich", "dieses", "dem"
+            ];
+
+            // Sehr kurze Fragen (<= 5 Wörter) sind oft Folgefragen
+            if (worte.length <= 5) return true;
+            
+            return trigger.some(t => text.startsWith(t));
+        }
+
+        // --- FUNKTION: SAUBERES SATZENDE (Verhindert abgehackte Sätze) ---
+        function sauberesEnde(text) {
+            text = text.trim();
+            if (text.endsWith('.') || text.endsWith('!') || text.endsWith('?')) {
+                return text;
+            }
+            
+            // Trennung nach Satzzeichen
+            const teile = text.split(/(?<=[.!?])\s+/);
+            if (teile.length > 1) {
+                return teile.slice(0, -1).join(' ').trim();
+            }
+            return text + ".";
+        }
+
+        // --- WEBSPEECH API (SPRACHERKENNUNG) ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (SpeechRecognition) {
@@ -79,67 +154,131 @@
                 const userText = event.results[0][0].transcript;
                 transcriptDiv.innerText = "Du: " + userText;
                 
-                // Hier rufen wir die KI-Logik auf
+                // KI aufrufen
                 askLeonardo(userText);
             };
 
             recognition.onend = () => { micButton.classList.remove('listening'); };
             recognition.onerror = () => { micButton.classList.remove('listening'); };
+        } else {
+            transcriptDiv.innerText = "Hinweis: Spracherkennung wird von diesem Browser nicht unterstützt. (Nutze Chrome/Safari)";
         }
 
-        // --- DIE KI FUNKTION (HIER KOMMT SPÄTER MAIA.AI REIN) ---
+        // --- HAUPTFUNKTION: KI ANTWORT GENERIEREN ---
         async function askLeonardo(question) {
+            if (!apiKey) {
+                speak("Es fehlt der Schlüssel zu meinem Geist. Bitte lade die Seite neu.");
+                return;
+            }
+
             isThinking = true;
-            micButton.style.opacity = "0.3"; // Button visuell deaktivieren
+            micButton.style.opacity = "0.3"; 
             statusText.innerText = "Leonardo denkt nach...";
             
-            // 1. Kurze Zwischenantwort, damit keine peinliche Stille entsteht
-            speak("Einen Moment, ich suche in meinen Aufzeichnungen...");
+            // Kurze akustische Rückmeldung
+            speak("Einen Moment, ich sinniere nach...");
 
-            // 2. SIMULATION der Wartezeit (Hier binden wir später die Maia-API an)
-            // Wir warten 3 Sekunden, um eine echte KI-Antwort zu simulieren
-            setTimeout(() => {
-                const answer = "Als Leonardo da Vinci fasziniert mich deine Frage zu '" + question + "'. Mein Geist arbeitet noch an der Vollendung dieser Antwort.";
+            // Kontext erweitern bei Folgefragen
+            let erweiterteFrage = question;
+            if (letztesThema && istFolgefrage(question)) {
+                erweiterteFrage = `Vorheriges Gesprächsthema:\n${letztesThema}\n\nAktuelle Frage:\n${question}`;
+            }
+
+            try {
+                // CORS-Proxy umgehen, um Anthropic direkt im Frontend nutzen zu können
+                const proxyUrl = "https://corsproxy.io/?https://api.anthropic.com/v1/messages";
                 
-                transcriptDiv.innerText = "Leonardo: " + answer;
-                speak(answer);
+                const response = await fetch(proxyUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-api-key": apiKey,
+                        "anthropic-version": "2023-06-01",
+                        "anthropic-dangerously-allow-browser": "true"
+                    },
+                    body: JSON.stringify({
+                        model: MODEL,
+                        max_tokens: MAXTOKENS,
+                        temperature: TEMP,
+                        system: `Du bist Leonardo da Vinci.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch:\n   - kurze Fragen -> eher kurze Antworten\n   - tiefgründige Fragen -> gerne ausführlicher antworten\n7. Moderne Themen aus der heutigen Zeit sollst du höflich und glaubwürdig abweisen, ohne wie ein Computer zu wirken.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich und freundlich. Formuliere dies jedes Mal etwas anders.\n9. Wiederhole dich möglichst wenig.\n10. Nutze vorherige Gesprächsthemen natürlich weiter, wenn die neue Frage offensichtlich darauf Bezug nimmt.\n11. Keine Aufzählungen außer wirklich nötig.\n12. Keine übertrieben poetische Sprache.\n13. Antworte vollständig abgeschlossen.`,
+                        messages: [
+                            ...chatHistory,
+                            {
+                                role: "user",
+                                content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}\n\nNutze ausschließlich das bereitgestellte Wissen. Wenn etwas dort nicht enthalten ist, sage das ehrlich und natürlich.`
+                            }
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API returned HTTP status ${response.status}`);
+                }
+
+                const data = await response.json();
+                let antwort = data.content[0].text.trim();
                 
-                // 3. Nach der Antwort alles wieder freischalten
-                isThinking = false;
-                micButton.style.opacity = "1";
-            }, 3500); 
+                // Sauberes Ende erzwingen wie in Python
+                antwort = sauberesEnde(antwort);
+
+                // Verlauf für die History speichern (begrenzt auf HISTORY_LENGTH Einträge)
+                chatHistory.push({ role: "user", content: question });
+                chatHistory.push({ role: "assistant", content: antwort });
+                if (chatHistory.length > HISTORY_LENGTH * 2) {
+                    chatHistory = chatHistory.slice(-HISTORY_LENGTH * 2);
+                }
+
+                // Letztes Thema merken (nur wenn es keine Folgefrage war)
+                if (!istFollowUp = istFolgefrage(question)) {
+                    letztesThema = question;
+                }
+
+                // Ausgabe auf UI und Sprache
+                transcriptDiv.innerText = "Leonardo: " + antwort;
+                speak(antwort);
+
+            } catch (error) {
+                console.error("Fehler beim API-Aufruf:", error);
+                transcriptDiv.innerText = "Leonardo: Verzeihung, mein Geist ist gerade blockiert. Bitte prüfe deinen API-Key oder deine Verbindung.";
+                speak("Verzeihung, mein Geist ist gerade blockiert.");
+            }
+
+            // UI wieder freischalten
+            isThinking = false;
+            micButton.style.opacity = "1";
+            statusText.innerText = "Bereit";
         }
 
-        // --- DIE SPRECH FUNKTION ---
+        // --- FUNKTION: SPRACHAUSGABE (TEXT-TO-SPEECH) ---
         function speak(text) {
             window.speechSynthesis.cancel();
             
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'de-DE';
             
-            // Stimmen-Suche (Markus für iPad, Conrad für PC)
+            // Suche nach passenden männlichen/historisch klingenden Stimmen
             const voices = window.speechSynthesis.getVoices();
             let v = voices.find(v => v.name.includes('Markus')) || 
                     voices.find(v => v.name.includes('Conrad')) || 
                     voices.find(v => v.name.includes('Kasper')) ||
                     voices.find(v => v.lang.includes('de') && v.name.toLowerCase().includes('male'));
             
-            if(v) msg.voice = v;
+            if (v) msg.voice = v;
             
-            msg.pitch = 0.85; // Tiefer
-            msg.rate = 0.9;   // Langsamer
+            msg.pitch = 0.85; // Etwas tiefere Stimme für Leonardo
+            msg.rate = 0.9;   // Etwas langsamere, weisere Sprechweise
             
-            // Kleiner Delay für iOS Stabilität
+            // Timeout für verlässliche Wiedergabe auf iOS/Safari Geräten
             setTimeout(() => {
                 window.speechSynthesis.speak(msg);
             }, 200);
         }
 
-        // --- DER BUTTON KLICK ---
+        // --- EVENT-LISTENER FÜR MIKROFON-BUTTON ---
         micButton.addEventListener('click', () => {
-            if (isThinking) return; // Klick ignorieren, wenn er gerade denkt
+            if (isThinking) return; 
 
-            // iPad Audio-Unlock beim ersten Mal
+            // Audio-Sperre für mobile Geräte (iPad/iPhone) beim ersten Klick aufheben
             if (!isAudioUnlocked) {
                 window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
                 isAudioUnlocked = true;
@@ -152,9 +291,9 @@
                     recognition.start();
                     micButton.classList.add('listening');
                     statusText.innerText = "Ich höre zu...";
-                    transcriptDiv.innerText = ""; // Altes löschen für neue Frage
+                    transcriptDiv.innerText = ""; 
                 } catch (e) {
-                    console.log("Erkennung läuft bereits");
+                    console.log("Spracherkennung läuft bereits");
                 }
             }
         });
