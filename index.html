@@ -3,35 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Leonardo KI - Museum</title>
+    <title>Leonardo KI - Museum Edition</title>
     <style>
-        body { margin: 0; background-color: #000; display: flex; flex-direction: column; height: 100vh; color: #d4af37; font-family: 'Georgia', serif; overflow: hidden; }
+        body { 
+            margin: 0; background-color: #000; display: flex; flex-direction: column; height: 100vh; 
+            color: #d4af37; font-family: 'Georgia', serif; overflow: hidden; 
+            user-select: none; -webkit-user-select: none; /* Verhindert Textmarkierung auf dem iPad */
+        }
         
         /* Lade-Anzeige */
         #loading-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 65vh;
+            position: absolute; top: 0; left: 0; width: 100%; height: 60vh;
             background: #000; display: flex; align-items: center; justify-content: center;
             z-index: 10; font-style: italic; color: #d4af37;
         }
 
-        model-viewer { height: 65vh; width: 100%; background: #000; }
+        model-viewer { height: 60vh; width: 100%; background: #000; }
         
-        #ui-container { height: 35vh; background: #000; border-top: 1px solid #d4af37; display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; }
+        #ui-container { 
+            height: 40vh; background: #000; border-top: 1px solid #d4af37; 
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between; 
+            padding: 15px; box-sizing: border-box; 
+        }
         
-        #status-text { font-style: italic; color: #888; font-size: 12px; margin-bottom: 5px; }
+        #status-text { font-style: italic; color: #888; font-size: 14px; margin-bottom: 2px; }
         
+        /* Button-Bereich für bessere iPad-Bedienung */
+        #action-row {
+            display: flex; align-items: center; justify-content: center; width: 100%; position: relative; gap: 20px;
+        }
+
         #mic-button { 
-            width: 70px; height: 70px; border-radius: 50%; border: 2px solid #d4af37; 
+            width: 80px; height: 80px; border-radius: 50%; border: 2px solid #d4af37; 
             background: #1a1a1a; display: flex; align-items: center; justify-content: center; 
-            margin-bottom: 10px; flex-shrink: 0; cursor: pointer;
-            outline: none !important; -webkit-tap-highlight-color: transparent;
+            cursor: pointer; outline: none !important; -webkit-tap-highlight-color: transparent;
         }
         
         #mic-button.listening { background: #600; border-color: #f44; box-shadow: 0 0 15px #f44; }
 
-        #transcript { font-size: 16px; color: #d4af37; text-align: center; width: 95%; height: 80px; overflow-y: auto; }
+        /* Eleganter Museums-Reset-Button */
+        .museum-btn {
+            background: #111; border: 1px solid #d4af37; color: #d4af37;
+            padding: 12px 20px; font-family: 'Georgia', serif; font-size: 14px;
+            border-radius: 4px; cursor: pointer; transition: all 0.2s;
+            outline: none !important; -webkit-tap-highlight-color: transparent;
+        }
+        .museum-btn:active { background: #d4af37; color: #000; }
+
+        #transcript { 
+            font-size: 18px; color: #d4af37; text-align: center; width: 95%; 
+            height: 90px; overflow-y: auto; margin-top: 5px; line-height: 1.4;
+        }
         
-        svg { fill: #d4af37; width: 32px; height: 32px; pointer-events: none; }
+        svg { fill: #d4af37; width: 36px; height: 36px; pointer-events: none; }
     </style>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
@@ -44,15 +68,24 @@
     </model-viewer>
 
     <div id="ui-container">
-        <div id="status-text">Bereit</div>
-        <button id="mic-button">
-            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
-        </button>
-        <div id="transcript">Tippe auf das Mikrofon...</div>
+        <div id="status-text">Initialisiere...</div>
+        
+        <div id="transcript">Willkommen im Museum. Bitte tippe auf das Mikrofon, um mit Leonardo da Vinci zu sprechen...</div>
+
+        <div id="action-row">
+            <button id="reset-button" class="museum-btn">Gespräch beenden</button>
+            
+            <button id="mic-button">
+                <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            </button>
+            
+            <div style="width: 145px; display: block;"></div> 
+        </div>
     </div>
 
     <script>
         const micButton = document.getElementById('mic-button');
+        const resetButton = document.getElementById('reset-button');
         const statusText = document.getElementById('status-text');
         const transcriptDiv = document.getElementById('transcript');
         const modelViewer = document.getElementById('leo');
@@ -62,7 +95,7 @@
         let isAudioUnlocked = false;
         let isThinking = false; 
 
-        // --- KI ENGINES & SPEICHER (AUS PYTHON ÜBERTRAGEN) ---
+        // --- KI SETTINGS ---
         const MODEL = "claude-haiku-4-5-20251001";
         const TEMP = 0.15;
         const MAXTOKENS = 220;
@@ -73,23 +106,29 @@
         let chatHistory = [];
         let letztesThema = "";
 
-        // Sobald das 3D-Modell bereit ist, starten wir die Initialisierung
-        modelViewer.addEventListener('load', async () => {
-            loadingOverlay.style.display = 'none';
+        // --- FRÜHE INITIALISIERUNG (MORGENS FÜR DAS PERSONAL) ---
+        document.addEventListener("DOMContentLoaded", async () => {
+            // 1. Sofort nach dem Key fragen, bevor irgendwas anderes passiert
+            apiKey = prompt("MUSEUMS-MODUS:\nBitte gib hier den Anthropic API-Key ein.\nDie Seite bleibt danach aktiv und betriebsbereit für die Besucher:");
             
-            // 1. API Key abfragen (Sichere Methode für statisches Frontend)
-            apiKey = prompt("Willkommen im Museum!\nBitte gib deinen Anthropic API-Key ein, um Leonardo zu aktivieren:");
             if (!apiKey) {
-                alert("Fehler: Ohne API-Key kann Leonardo nicht antworten. Bitte lade die Seite neu.");
-                statusText.innerText = "Kein API-Key gesetzt.";
+                alert("Kritischer Fehler: Kein Key eingegeben. Die KI wird nicht antworten.");
+                statusText.innerText = "Konfigurationsfehler: Kein API-Key.";
+                transcriptDiv.innerText = "Bitte lade die Seite neu und gib den Key ein.";
+                loadingOverlay.style.display = 'none';
                 return;
             }
 
-            // 2. Die 4 Textdateien direkt aus dem GitHub-Verzeichnis laden
-            statusText.innerText = "Lade Wissen...";
+            statusText.innerText = "Lade Exponat-Wissen...";
             await ladeWissen();
-            statusText.innerText = "Bereit";
-            transcriptDiv.innerText = "Ich bin bereit. Tippe auf das Mikrofon und sprich mit mir...";
+            
+            statusText.innerText = "Bereit für Besucher";
+            // Sicherheitsnetz für den Ladebildschirm
+            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 2000);
+        });
+
+        modelViewer.addEventListener('load', () => {
+            loadingOverlay.style.display = 'none';
         });
 
         // --- FUNKTION: TEXTDATEIEN LADEN ---
@@ -100,51 +139,50 @@
                     const response = await fetch(datei);
                     if (!response.ok) throw new Error(`Status: ${response.status}`);
                     const text = await response.text();
-                    
-                    // Name der Datei als Überschrift formatieren wie im Python Code
                     const titel = datei.replace('.txt', '').toUpperCase();
                     leonardoWissen += `=== ${titel} ===\n${text.trim()}\n\n`;
                 } catch (e) {
-                    console.error("Fehler beim Laden der Wissensdatei: " + datei, e);
+                    console.error("Fehler beim Laden von: " + datei, e);
                 }
             }
         }
 
-        // --- FUNKTION: FOLGEFRAGEN ERKENNEN ---
+        // --- RESET FUNKTION (FÜR NEUE BESUCHER) ---
+        function resetConversation() {
+            window.speechSynthesis.cancel(); // Stoppt sofort das aktuelle Sprechen
+            chatHistory = [];
+            letztesThema = "";
+            isThinking = false;
+            micButton.style.opacity = "1";
+            
+            statusText.innerText = "Bereit für neuen Besucher";
+            transcriptDiv.innerText = "Ich habe mein Gedächtnis erfrischt. Tippe auf das Mikrofon, um ein neues Gespräch mit mir zu beginnen.";
+            
+            // Kurze, freundliche Audio-Begrüßung für den nächsten in der Schlange
+            speak("Seid gegrüßt, mein Freund! Was führt Euch zu meinen Werken?");
+        }
+
+        resetButton.addEventListener('click', resetConversation);
+
+        // --- HILFSFUNKTIONEN (FOLGEFRAGEN & SATZENDE) ---
         function istFolgefrage(frage) {
             const text = frage.toLowerCase().trim();
             const worte = text.split(/\s+/);
-            
-            const trigger = [
-                "das", "dafür", "darauf", "wann", "wie lange", "wie viel", 
-                "warum", "wo", "wer", "wie", "und", "danach", "dann", 
-                "wirklich", "dieses", "dem"
-            ];
-
-            // Sehr kurze Fragen (<= 5 Wörter) sind oft Folgefragen
+            const trigger = ["das", "dafür", "darauf", "wann", "wie lange", "wie viel", "warum", "wo", "wer", "wie", "und", "danach", "dann", "wirklich", "dieses", "dem"];
             if (worte.length <= 5) return true;
-            
             return trigger.some(t => text.startsWith(t));
         }
 
-        // --- FUNKTION: SAUBERES SATZENDE (Verhindert abgehackte Sätze) ---
         function sauberesEnde(text) {
             text = text.trim();
-            if (text.endsWith('.') || text.endsWith('!') || text.endsWith('?')) {
-                return text;
-            }
-            
-            // Trennung nach Satzzeichen
+            if (text.endsWith('.') || text.endsWith('!') || text.endsWith('?')) return text;
             const teile = text.split(/(?<=[.!?])\s+/);
-            if (teile.length > 1) {
-                return teile.slice(0, -1).join(' ').trim();
-            }
+            if (teile.length > 1) return teile.slice(0, -1).join(' ').trim();
             return text + ".";
         }
 
-        // --- WEBSPEECH API (SPRACHERKENNUNG) ---
+        // --- WEBSPEECH API ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.lang = 'de-DE';
@@ -153,41 +191,31 @@
                 if (isThinking) return;
                 const userText = event.results[0][0].transcript;
                 transcriptDiv.innerText = "Du: " + userText;
-                
-                // KI aufrufen
                 askLeonardo(userText);
             };
 
             recognition.onend = () => { micButton.classList.remove('listening'); };
             recognition.onerror = () => { micButton.classList.remove('listening'); };
         } else {
-            transcriptDiv.innerText = "Hinweis: Spracherkennung wird von diesem Browser nicht unterstützt. (Nutze Chrome/Safari)";
+            transcriptDiv.innerText = "Hinweis: Spracherkennung wird auf diesem iPad-Browser nicht unterstützt. Bitte Safari verwenden.";
         }
 
-        // --- HAUPTFUNKTION: KI ANTWORT GENERIEREN ---
+        // --- KI ANTWORT GENERIEREN ---
         async function askLeonardo(question) {
-            if (!apiKey) {
-                speak("Es fehlt der Schlüssel zu meinem Geist. Bitte lade die Seite neu.");
-                return;
-            }
-
+            if (!apiKey) return;
+            
             isThinking = true;
             micButton.style.opacity = "0.3"; 
             statusText.innerText = "Leonardo denkt nach...";
-            
-            // Kurze akustische Rückmeldung
             speak("Einen Moment, ich sinniere nach...");
 
-            // Kontext erweitern bei Folgefragen
             let erweiterteFrage = question;
             if (letztesThema && istFolgefrage(question)) {
                 erweiterteFrage = `Vorheriges Gesprächsthema:\n${letztesThema}\n\nAktuelle Frage:\n${question}`;
             }
 
             try {
-                // CORS-Proxy umgehen, um Anthropic direkt im Frontend nutzen zu können
                 const proxyUrl = "https://corsproxy.io/?https://api.anthropic.com/v1/messages";
-                
                 const response = await fetch(proxyUrl, {
                     method: "POST",
                     headers: {
@@ -200,85 +228,62 @@
                         model: MODEL,
                         max_tokens: MAXTOKENS,
                         temperature: TEMP,
-                        system: `Du bist Leonardo da Vinci.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch:\n   - kurze Fragen -> eher kurze Antworten\n   - tiefgründige Fragen -> gerne ausführlicher antworten\n7. Moderne Themen aus der heutigen Zeit sollst du höflich und glaubwürdig abweisen, ohne wie ein Computer zu wirken.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich und freundlich. Formuliere dies jedes Mal etwas anders.\n9. Wiederhole dich möglichst wenig.\n10. Nutze vorherige Gesprächsthemen natürlich weiter, wenn die neue Frage offensichtlich darauf Bezug nimmt.\n11. Keine Aufzählungen außer wirklich nötig.\n12. Keine übertrieben poetische Sprache.\n13. Antworte vollständig abgeschlossen.`,
+                        system: `Du bist Leonardo da Vinci im Museum.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch.\n7. Moderne Themen abweisen.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich.\n9. Wiederhole dich möglichst wenig.\n10. Keine Aufzählungen außer nötig.\n11. Antworte vollständig abgeschlossen.`,
                         messages: [
                             ...chatHistory,
                             {
                                 role: "user",
-                                content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}\n\nNutze ausschließlich das bereitgestellte Wissen. Wenn etwas dort nicht enthalten ist, sage das ehrlich und natürlich.`
+                                content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}`
                             }
                         ]
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`API returned HTTP status ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`API Fehler ${response.status}`);
 
                 const data = await response.json();
-                let antwort = data.content[0].text.trim();
+                let antwort = sauberesEnde(data.content[0].text.trim());
                 
-                // Sauberes Ende erzwingen wie in Python
-                antwort = sauberesEnde(antwort);
-
-                // Verlauf für die History speichern (begrenzt auf HISTORY_LENGTH Einträge)
                 chatHistory.push({ role: "user", content: question });
                 chatHistory.push({ role: "assistant", content: antwort });
-                if (chatHistory.length > HISTORY_LENGTH * 2) {
-                    chatHistory = chatHistory.slice(-HISTORY_LENGTH * 2);
-                }
+                if (chatHistory.length > HISTORY_LENGTH * 2) chatHistory = chatHistory.slice(-HISTORY_LENGTH * 2);
 
-                // Letztes Thema merken (nur wenn es keine Folgefrage war)
-                if (!istFollowUp = istFolgefrage(question)) {
-                    letztesThema = question;
-                }
+                if (!istFolgefrage(question)) letztesThema = question;
 
-                // Ausgabe auf UI und Sprache
                 transcriptDiv.innerText = "Leonardo: " + antwort;
                 speak(antwort);
 
             } catch (error) {
-                console.error("Fehler beim API-Aufruf:", error);
-                transcriptDiv.innerText = "Leonardo: Verzeihung, mein Geist ist gerade blockiert. Bitte prüfe deinen API-Key oder deine Verbindung.";
+                console.error("API-Fehler:", error);
+                transcriptDiv.innerText = "Verzeihung, mein Geist ist gerade blockiert. Bitte wende dich an das Museumspersonal.";
                 speak("Verzeihung, mein Geist ist gerade blockiert.");
             }
 
-            // UI wieder freischalten
             isThinking = false;
             micButton.style.opacity = "1";
-            statusText.innerText = "Bereit";
+            statusText.innerText = "Bereit für Fragen";
         }
 
-        // --- FUNKTION: SPRACHAUSGABE (TEXT-TO-SPEECH) ---
+        // --- SPRACHAUSGABE ---
         function speak(text) {
             window.speechSynthesis.cancel();
-            
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'de-DE';
             
-            // Suche nach passenden männlichen/historisch klingenden Stimmen
             const voices = window.speechSynthesis.getVoices();
-            let v = voices.find(v => v.name.includes('Markus')) || 
-                    voices.find(v => v.name.includes('Conrad')) || 
-                    voices.find(v => v.name.includes('Kasper')) ||
-                    voices.find(v => v.lang.includes('de') && v.name.toLowerCase().includes('male'));
-            
+            let v = voices.find(v => v.name.includes('Markus') || v.name.includes('Conrad') || v.name.includes('Kasper') || (v.lang.includes('de') && v.name.toLowerCase().includes('male')));
             if (v) msg.voice = v;
+            msg.pitch = 0.85; 
+            msg.rate = 0.9;   
             
-            msg.pitch = 0.85; // Etwas tiefere Stimme für Leonardo
-            msg.rate = 0.9;   // Etwas langsamere, weisere Sprechweise
-            
-            // Timeout für verlässliche Wiedergabe auf iOS/Safari Geräten
-            setTimeout(() => {
-                window.speechSynthesis.speak(msg);
-            }, 200);
+            setTimeout(() => { window.speechSynthesis.speak(msg); }, 200);
         }
 
-        // --- EVENT-LISTENER FÜR MIKROFON-BUTTON ---
+        // --- MIKROFON KLICK ---
         micButton.addEventListener('click', () => {
             if (isThinking) return; 
 
-            // Audio-Sperre für mobile Geräte (iPad/iPhone) beim ersten Klick aufheben
+            // Audio-Kontext-Aktivierung für iOS / iPadOS Safari
             if (!isAudioUnlocked) {
                 window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
                 isAudioUnlocked = true;
