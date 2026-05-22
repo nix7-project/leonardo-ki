@@ -136,6 +136,7 @@
             }
         }
 
+        // Absolut stummes Zurücksetzen für den nächsten Nutzer
         function resetConversation() {
             window.speechSynthesis.cancel();
             chatHistory = [];
@@ -197,15 +198,14 @@
             }
 
             try {
-                // Nutzung eines stabilen, standardisierten CORS-Proxies OHNE unzulässige Header-Verschmutzung
-                const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent("https://api.anthropic.com/v1/messages");
-                
-                const response = await fetch(proxyUrl, {
+                // Direkter, nativer API-Aufruf zu Anthropic unter Einhaltung der neuen Header-Vorgaben
+                const response = await fetch("https://api.anthropic.com/v1/messages", {
                     method: "POST",
                     headers: { 
                         "Content-Type": "application/json", 
                         "x-api-key": apiKey, 
-                        "anthropic-version": "2023-06-01"
+                        "anthropic-version": "2023-06-01",
+                        "anthropic-dangerous-direct-browser-access": "true" // Der fehlende Schlüssel aus dem Fehlerbild!
                     },
                     body: JSON.stringify({
                         model: MODEL,
@@ -240,10 +240,9 @@
                 speak(antwort);
 
             } catch (error) {
-                console.error("Detaillierter API-Fehler:", error);
-                // Gibt den exakten Fehler auf dem iPad-Bildschirm aus, damit wir nicht im Dunkeln tappen!
-                transcriptDiv.innerText = `System-Blockade: ${error.message}`;
-                speak("Verzeihung, mein Geist ist blockiert.");
+                console.error("API-Fehler:", error);
+                transcriptDiv.innerText = `Verzeihung, mein Geist ist gerade blockiert.`;
+                speak("Verzeihung, mein Geist ist gerade blockiert.");
             }
 
             isThinking = false;
