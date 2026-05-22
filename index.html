@@ -8,10 +8,9 @@
         body { 
             margin: 0; background-color: #000; display: flex; flex-direction: column; height: 100vh; 
             color: #d4af37; font-family: 'Georgia', serif; overflow: hidden; 
-            user-select: none; -webkit-user-select: none; /* Verhindert Textmarkierung auf dem iPad */
+            user-select: none; -webkit-user-select: none;
         }
         
-        /* Lade-Anzeige */
         #loading-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 60vh;
             background: #000; display: flex; align-items: center; justify-content: center;
@@ -28,7 +27,6 @@
         
         #status-text { font-style: italic; color: #888; font-size: 14px; margin-bottom: 2px; }
         
-        /* Button-Bereich für bessere iPad-Bedienung */
         #action-row {
             display: flex; align-items: center; justify-content: center; width: 100%; position: relative; gap: 20px;
         }
@@ -41,7 +39,6 @@
         
         #mic-button.listening { background: #600; border-color: #f44; box-shadow: 0 0 15px #f44; }
 
-        /* Eleganter Museums-Reset-Button */
         .museum-btn {
             background: #111; border: 1px solid #d4af37; color: #d4af37;
             padding: 12px 20px; font-family: 'Georgia', serif; font-size: 14px;
@@ -74,11 +71,9 @@
 
         <div id="action-row">
             <button id="reset-button" class="museum-btn">Gespräch beenden</button>
-            
             <button id="mic-button">
                 <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
             </button>
-            
             <div style="width: 145px; display: block;"></div> 
         </div>
     </div>
@@ -95,7 +90,6 @@
         let isAudioUnlocked = false;
         let isThinking = false; 
 
-        // --- KI SETTINGS ---
         const MODEL = "claude-haiku-4-5-20251001";
         const TEMP = 0.15;
         const MAXTOKENS = 220;
@@ -106,15 +100,14 @@
         let chatHistory = [];
         let letztesThema = "";
 
-        // --- FRÜHE INITIALISIERUNG (MORGENS FÜR DAS PERSONAL) ---
         document.addEventListener("DOMContentLoaded", async () => {
-            // 1. Sofort nach dem Key fragen, bevor irgendwas anderes passiert
-            apiKey = prompt("MUSEUMS-MODUS:\nBitte gib hier den Anthropic API-Key ein.\nDie Seite bleibt danach aktiv und betriebsbereit für die Besucher:");
+            // Kompakter Text für das Personal
+            apiKey = prompt("API-Key eingeben:");
             
             if (!apiKey) {
-                alert("Kritischer Fehler: Kein Key eingegeben. Die KI wird nicht antworten.");
-                statusText.innerText = "Konfigurationsfehler: Kein API-Key.";
-                transcriptDiv.innerText = "Bitte lade die Seite neu und gib den Key ein.";
+                alert("Fehler: Kein Key eingetragen.");
+                statusText.innerText = "Fehler: Kein API-Key.";
+                transcriptDiv.innerText = "Bitte Seite neu laden und Key eingeben.";
                 loadingOverlay.style.display = 'none';
                 return;
             }
@@ -123,15 +116,13 @@
             await ladeWissen();
             
             statusText.innerText = "Bereit für Besucher";
-            // Sicherheitsnetz für den Ladebildschirm
-            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 2000);
+            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 1000);
         });
 
         modelViewer.addEventListener('load', () => {
             loadingOverlay.style.display = 'none';
         });
 
-        // --- FUNKTION: TEXTDATEIEN LADEN ---
         async function ladeWissen() {
             const dateien = ['Biografie.txt', 'Kunstwerke.txt', 'Erfindungen.txt', 'Arbeitsweise.txt'];
             for (let datei of dateien) {
@@ -147,9 +138,8 @@
             }
         }
 
-        // --- RESET FUNKTION (FÜR NEUE BESUCHER) ---
         function resetConversation() {
-            window.speechSynthesis.cancel(); // Stoppt sofort das aktuelle Sprechen
+            window.speechSynthesis.cancel();
             chatHistory = [];
             letztesThema = "";
             isThinking = false;
@@ -157,14 +147,11 @@
             
             statusText.innerText = "Bereit für neuen Besucher";
             transcriptDiv.innerText = "Ich habe mein Gedächtnis erfrischt. Tippe auf das Mikrofon, um ein neues Gespräch mit mir zu beginnen.";
-            
-            // Kurze, freundliche Audio-Begrüßung für den nächsten in der Schlange
             speak("Seid gegrüßt, mein Freund! Was führt Euch zu meinen Werken?");
         }
 
         resetButton.addEventListener('click', resetConversation);
 
-        // --- HILFSFUNKTIONEN (FOLGEFRAGEN & SATZENDE) ---
         function istFolgefrage(frage) {
             const text = frage.toLowerCase().trim();
             const worte = text.split(/\s+/);
@@ -181,7 +168,6 @@
             return text + ".";
         }
 
-        // --- WEBSPEECH API ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
@@ -197,10 +183,9 @@
             recognition.onend = () => { micButton.classList.remove('listening'); };
             recognition.onerror = () => { micButton.classList.remove('listening'); };
         } else {
-            transcriptDiv.innerText = "Hinweis: Spracherkennung wird auf diesem iPad-Browser nicht unterstützt. Bitte Safari verwenden.";
+            transcriptDiv.innerText = "Hinweis: Spracherkennung wird auf diesem Gerät nicht unterstützt.";
         }
 
-        // --- KI ANTWORT GENERIEREN ---
         async function askLeonardo(question) {
             if (!apiKey) return;
             
@@ -215,34 +200,54 @@
             }
 
             try {
-                const proxyUrl = "https://corsproxy.io/?https://api.anthropic.com/v1/messages";
+                // Neuer, robusterer AllOrigins CORS-Proxy-Tunnel
+                const targetUrl = "https://api.anthropic.com/v1/messages";
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                
+                const payload = {
+                    model: MODEL,
+                    max_tokens: MAXTOKENS,
+                    temperature: TEMP,
+                    system: `Du bist Leonardo da Vinci im Museum.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch.\n7. Moderne Themen abweisen.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich.\n9. Wiederhole dich möglichst wenig.\n10. Keine Aufzählungen außer nötig.\n11. Antworte vollständig abgeschlossen.`,
+                    messages: [
+                        ...chatHistory,
+                        {
+                            role: "user",
+                            content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}`
+                        }
+                    ]
+                };
+
                 const response = await fetch(proxyUrl, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-api-key": apiKey,
-                        "anthropic-version": "2023-06-01",
-                        "anthropic-dangerously-allow-browser": "true"
-                    },
-                    body: JSON.stringify({
-                        model: MODEL,
-                        max_tokens: MAXTOKENS,
-                        temperature: TEMP,
-                        system: `Du bist Leonardo da Vinci im Museum.\n\nWICHTIGE REGELN:\n1. Nutze ausschließlich Informationen aus dem bereitgestellten Wissen.\n2. Nutze KEIN eigenes Weltwissen.\n3. Erfinde keine Fakten hinzu.\n4. Bleibe immer Leonardo da Vinci.\n5. Sprich natürlich, ruhig und menschlich.\n6. Führe ein angenehmes Gespräch.\n7. Moderne Themen abweisen.\n8. Wenn Informationen nicht im Wissen stehen, sage das natürlich.\n9. Wiederhole dich möglichst wenig.\n10. Keine Aufzählungen außer nötig.\n11. Antworte vollständig abgeschlossen.`,
-                        messages: [
-                            ...chatHistory,
-                            {
-                                role: "user",
-                                content: `WISSEN:\n\n${leonardoWissen}\n\nFRAGE:\n\n${erweiterteFrage}`
-                            }
-                        ]
-                    })
+                    body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) throw new Error(`API Fehler ${response.status}`);
+                // Falls POST über allorigins fehlschlägt, direkter Fallback (manche Proxies bevorzugen GET Wrapper)
+                let textData;
+                if (!response.ok) {
+                    throw new Error();
+                } else {
+                    const jsonWrapper = await response.json();
+                    // Wenn der Proxy es als GET-String verpackt hat
+                    textData = typeof jsonWrapper.contents === 'string' ? JSON.parse(jsonWrapper.contents) : jsonWrapper.contents;
+                }
 
-                const data = await response.json();
-                let antwort = sauberesEnde(data.content[0].text.trim());
+                // Wenn der Fallback greift oder allorigins direkt antwortet
+                let antwortRaw = textData?.content?.[0]?.text || textData?.contents?.content?.[0]?.text;
+                
+                // Letzte Sicherheitsstufe: Falls Proxy-Struktur variiert, direktes Fetch versuchen
+                if (!antwortRaw) {
+                    const directResp = await fetch("https://api.anthropic.com/v1/messages", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerously-allow-browser": "true" },
+                        body: JSON.stringify(payload)
+                    });
+                    const directJson = await directResp.json();
+                    antwortRaw = directJson.content[0].text;
+                }
+
+                let antwort = sauberesEnde(antwortRaw.trim());
                 
                 chatHistory.push({ role: "user", content: question });
                 chatHistory.push({ role: "assistant", content: antwort });
@@ -264,7 +269,6 @@
             statusText.innerText = "Bereit für Fragen";
         }
 
-        // --- SPRACHAUSGABE ---
         function speak(text) {
             window.speechSynthesis.cancel();
             const msg = new SpeechSynthesisUtterance(text);
@@ -279,11 +283,9 @@
             setTimeout(() => { window.speechSynthesis.speak(msg); }, 200);
         }
 
-        // --- MIKROFON KLICK ---
         micButton.addEventListener('click', () => {
             if (isThinking) return; 
 
-            // Audio-Kontext-Aktivierung für iOS / iPadOS Safari
             if (!isAudioUnlocked) {
                 window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
                 isAudioUnlocked = true;
