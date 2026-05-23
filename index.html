@@ -107,7 +107,6 @@
             isThinking = true;
             micButton.style.opacity = "0.3"; 
             transcriptDiv.innerText = "Du: " + question;
-            
             statusText.innerText = FUELLSÄTZE[Math.floor(Math.random() * FUELLSÄTZE.length)];
 
             try {
@@ -117,13 +116,22 @@
                         "Content-Type": "application/json", 
                         "x-api-key": apiKey, 
                         "anthropic-version": "2023-06-01",
-                        "anthropic-dangerous-direct-browser-access": "true" 
+                        "anthropic-dangerous-direct-browser-access": "true",
+                        "anthropic-beta": "prompt-caching-2024-07-31" // Schaltet das offizielle Caching-Feature frei
                     },
                     body: JSON.stringify({
                         model: "claude-haiku-4-5-20251001",
                         max_tokens: 160, 
                         temperature: 0.6,
-                        system: `Du bist Leonardo da Vinci. Nutze das WISSEN. REGELN FÜR DICH:\n1. Führe ein menschliches, fließendes Gespräch.\n2. Antworte EXTREM kompakt (maximal 2 bis 3 kurze Sätze!).\n3. Wenn nach mehreren Dingen gefragt wird (z.B. Maschinen), fasse sie in einem eleganten Satz zusammen.\n4. Keine Bulletpoints, keine Listen.\n5. Sei charmant und direkt.\n6. WICHTIG: Nutze NIEMALS Regieanweisungen, beschreibe keine Gestik oder Mimik (wie *lächelt* oder "Leonardo denkt nach"). Sprich AUSSCHLIESSLICH den Text, den du laut sagen würdest.\n\nWISSEN:\n${leonardoWissen}`,
+                        // Der System-Prompt ist jetzt ein Array, damit wir ihn gezielt "cachen" (zwischenspeichern) können
+                        system: [
+                            {
+                                type: "text",
+                                text: `Du bist Leonardo da Vinci. Nutze das WISSEN. REGELN FÜR DICH:\n1. Führe ein menschliches, fließendes Gespräch.\n2. Antworte EXTREM kompakt (maximal 2 bis 3 kurze Sätze!).\n3. Wenn nach mehreren Dingen gefragt wird (z.B. Maschinen), fasse sie in einem eleganten Satz zusammen.\n4. Keine Bulletpoints, keine Listen.\n5. Sei charmant und direkt.\n6. WICHTIG: Nutze NIEMALS Regieanweisungen, beschreibe keine Gestik oder Mimik (wie *lächelt* oder "Leonardo denkt nach"). Sprich AUSSCHLIESSLICH den Text, den du laut sagen würdest.\n\nWISSEN:\n${leonardoWissen}`,
+                                cache_control: { type: "ephemeral" } // Das ist der magische Schlüssel zur extremen Beschleunigung
+                            }
+                        ],
+                        // Die History bleibt exakt, wie du es gewünscht hast, für perfekten Kontext!
                         messages: [...chatHistory, { role: "user", content: question }]
                     })
                 });
