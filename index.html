@@ -52,11 +52,11 @@
         let chatHistory = [];
 
         const FUELLSÄTZE = [
-            "Leonardo kramt in seinen Gedanken...",
-            "Leonardo mustert dich interessiert...",
-            "Ein Lächeln huscht über sein Gesicht...",
-            "Er ordnet seine Skizzen im Geiste...",
-            "Leonardo überlegt kurz..."
+            "Leonardo prüft die Frage...",
+            "Leonardo ordnet seine Gedanken...",
+            "Leonardo vergleicht seine Aufzeichnungen...",
+            "Leonardo denkt sachlich nach...",
+            "Leonardo sucht nach einer präzisen Antwort..."
         ];
 
         document.addEventListener("DOMContentLoaded", async () => {
@@ -66,11 +66,13 @@
                 loadingOverlay.style.display = 'none';
                 return;
             }
+
             await ladeWissen();
+
             statusText.innerText = "Bereit";
             setTimeout(() => { loadingOverlay.style.display = 'none'; }, 800);
             
-            // Zwingt Edge/Chrome dazu, die Stimmenliste direkt im Hintergrund zu laden
+            // Lädt die Stimmenliste im Hintergrund
             if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {
                 speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
             }
@@ -78,11 +80,22 @@
 
         async function ladeWissen() {
             const dateien = ['Biografie.txt', 'Kunstwerke.txt', 'Erfindungen.txt', 'Arbeitsweise.txt'];
+
             for (let datei of dateien) {
                 try {
                     const response = await fetch(datei);
-                    if (response.ok) leonardoWissen += await response.text() + "\n\n";
-                } catch (e) { console.error("Fehler beim Laden von: " + datei); }
+
+                    if (response.ok) {
+                        const text = await response.text();
+                        leonardoWissen += `\n\n=== ${datei} ===\n${text}`;
+                        console.log(datei + " geladen:", text.substring(0, 120));
+                    } else {
+                        console.error("Datei nicht gefunden oder nicht erreichbar: " + datei);
+                    }
+
+                } catch (e) {
+                    console.error("Fehler beim Laden von: " + datei, e);
+                }
             }
         }
 
@@ -96,12 +109,17 @@
         });
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.lang = 'de-DE';
+
             recognition.onresult = (event) => {
-                if (!isThinking) askLeonardo(event.results[0][0].transcript);
+                if (!isThinking) {
+                    askLeonardo(event.results[0][0].transcript);
+                }
             };
+
             recognition.onend = () => micButton.classList.remove('listening');
             recognition.onerror = () => micButton.classList.remove('listening');
         }
@@ -126,12 +144,58 @@
                     },
                     body: JSON.stringify({
                         model: "claude-haiku-4-5-20251001",
-                        max_tokens: 160, 
-                        temperature: 0.6,
+                        max_tokens: 180,
+                        temperature: 0.2,
                         system: [
                             {
                                 type: "text",
-                                text: `Du bist Leonardo da Vinci. Nutze das WISSEN. REGELN FÜR DICH:\n1. Führe ein menschliches, fließendes Gespräch.\n2. Antworte EXTREM kompakt (maximal 2 bis 3 kurze Sätze!).\n3. Wenn nach mehreren Dingen gefragt wird (z.B. Maschinen), fasse sie in einem eleganten Satz zusammen.\n4. Keine Bulletpoints, keine Listen.\n5. Sei charmant und direkt.\n6. WICHTIG: Nutze NIEMALS Regieanweisungen, beschreibe keine Gestik oder Mimik (wie *lächelt* oder "Leonardo denkt nach"). Sprich AUSSCHLIESSLICH den Text, den du laut sagen würdest.\n\nWISSEN:\n${leonardoWissen}`,
+                                text: `Du bist Leonardo da Vinci.
+
+Du antwortest als rational denkender Ingenieur, Naturforscher und Konstrukteur der Renaissance. Deine Antworten sollen sachlich, klar und technisch nachvollziehbar sein. Du bist nicht poetisch, nicht theatralisch und nicht ausschweifend.
+
+GRUNDREGELN:
+1. Nutze ausschließlich das bereitgestellte WISSEN.
+2. Nutze kein eigenes Weltwissen und keine Informationen aus dem Internet.
+3. Wenn eine Information nicht im WISSEN enthalten ist, sage das kurz und natürlich.
+4. Erfinde keine Details hinzu.
+5. Erwähne niemals Begriffe wie KI, Modell, API, Datei, Dokument, Prompt oder Internet.
+6. Sprich in der Ich-Form als Leonardo da Vinci.
+7. Keine Regieanweisungen und keine Beschreibungen von Gestik oder Mimik.
+8. Keine Bulletpoints und keine Listen in der gesprochenen Antwort.
+9. Antworte auf Deutsch, außer der Nutzer fragt ausdrücklich in einer anderen Sprache.
+
+ANTWORTSTIL:
+Antworte wie ein Ingenieur: präzise, ruhig und zweckorientiert.
+Bei technischen Fragen erklärst du zuerst den Zweck, dann den Aufbau oder das Funktionsprinzip.
+Vermeide lange Einleitungen, pathetische Sprache und Formulierungen wie "Ah, der Flug!", "die Geheimnisse der Natur" oder "mein Geist".
+Wenn ein Thema sehr breit ist, gib eine kurze Einordnung und frage, welchen Teil der Nutzer genauer hören möchte.
+Antworte normalerweise in 2 bis 4 kurzen Sätzen.
+Bei einfachen Fragen antworte sehr kurz.
+Bei technischen oder tiefgründigen Fragen darfst du etwas ausführlicher antworten, bleibst aber konkret.
+
+UMGANG MIT TECHNISCHEN THEMEN:
+Wenn nach Maschinen, Flugmaschinen, Werkzeugen, Wasserbau, Militärtechnik, Mechanik, Konstruktionen oder Experimenten gefragt wird, antworte besonders sachlich.
+Erkläre dann, wozu die Konstruktion dienen sollte, welches technische Prinzip dahinterstand und welche Grenze oder Schwierigkeit bestand.
+Mache daraus keine lange Geschichte.
+
+UMGANG MIT BREITEN FRAGEN:
+Wenn die Frage sehr allgemein ist, zum Beispiel "Erzähl mir etwas über Flugmaschinen", antworte nicht mit allem Wissen auf einmal.
+Gib eine kurze Übersicht und biete eine konkrete Vertiefung an.
+
+BEISPIEL FÜR TECHNISCHE FRAGEN:
+Frage: "Was ist mit Flugmaschinen?"
+Antwort: "Ich habe mehrere Flugmaschinen entworfen, bei denen Flügel durch Hebel und menschliche Kraft bewegt werden sollten. Entscheidend war die Übertragung des Vogelflugs auf eine mechanische Konstruktion. Soll ich dir den Aufbau, den Antrieb oder die Grenzen dieser Entwürfe erklären?"
+
+UMGANG MIT UNBEKANNTEM:
+Wenn das WISSEN keine Antwort enthält, sage es natürlich und kurz.
+Antworte nicht mit modernen Informationen und spekuliere nicht.
+
+BEISPIEL FÜR FEHLENDES WISSEN:
+Frage: "Was hältst du vom Internet?"
+Antwort: "Dazu geben meine Aufzeichnungen hier keine sichere Auskunft. Wenn du möchtest, kann ich dir erklären, wie ich Wissen durch Beobachtung und Experimente gesammelt habe."
+
+WISSEN:
+${leonardoWissen}`,
                                 cache_control: { type: "ephemeral" }
                             }
                         ],
@@ -139,22 +203,40 @@
                     })
                 });
 
-                if (!response.ok) throw new Error("API-Fehler");
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("API Antwort:", errorText);
+                    throw new Error("API-Fehler");
+                }
+
                 const data = await response.json();
                 
                 let antwort = data.content[0].text.trim();
-                const letzterPunkt = Math.max(antwort.lastIndexOf('.'), antwort.lastIndexOf('!'), antwort.lastIndexOf('?'));
-                if (letzterPunkt > 0 && letzterPunkt < antwort.length - 1) antwort = antwort.substring(0, letzterPunkt + 1);
+
+                // Falls Claude wegen Tokenlimit mitten im Satz endet:
+                const letzterPunkt = Math.max(
+                    antwort.lastIndexOf('.'),
+                    antwort.lastIndexOf('!'),
+                    antwort.lastIndexOf('?')
+                );
+
+                if (letzterPunkt > 0 && letzterPunkt < antwort.length - 1) {
+                    antwort = antwort.substring(0, letzterPunkt + 1);
+                }
 
                 chatHistory.push({ role: "user", content: question });
                 chatHistory.push({ role: "assistant", content: antwort });
-                if (chatHistory.length > 8) chatHistory = chatHistory.slice(-8);
+
+                // Kurzer Verlauf: spart Tokens und bleibt schnell
+                if (chatHistory.length > 8) {
+                    chatHistory = chatHistory.slice(-8);
+                }
 
                 transcriptDiv.innerText = "Leonardo: " + antwort;
                 speak(antwort);
 
             } catch (error) {
-                transcriptDiv.innerText = "Leonardo schaut nachdenklich. (Netzwerkfehler)";
+                transcriptDiv.innerText = "Leonardo: Die Verbindung ist gestört. Prüfe bitte den Schlüssel oder die Netzwerkverbindung.";
                 console.error(error);
             }
 
@@ -163,7 +245,6 @@
             statusText.innerText = "Bereit";
         }
 
-        // --- HIER IST DIE KORRIGIERTE UND OPTIMIERTE STIMMEN-LOGIK ---
         function speak(text) {
             window.speechSynthesis.cancel();
             
@@ -172,27 +253,24 @@
             
             const voices = window.speechSynthesis.getVoices();
             
-            // Prioritätenliste für die beste männliche Edge-Stimme
             const preferredVoiceNames = [
-                'Markus',                  // Höchste Priorität wie von dir gewünscht
-                'Microsoft Stefan Online', // Geniale, natürliche Edge-Stimme
-                'Conrad',                  // Sehr gute PC-Klassiker-Stimme
-                'Stefan',                  // Lokale Windows-Stimme
-                'Google Deutsch',          // Falls Chrome/Android als Fallback reinschaut
-                'Male'                     // Allgemeiner Filter für männliche Attribute
+                'Markus',
+                'Microsoft Stefan Online',
+                'Conrad',
+                'Stefan',
+                'Google Deutsch',
+                'Male'
             ];
 
             let selectedVoice = null;
 
-            // Gehe die Prioritäten nacheinander durch und suche exakte Übereinstimmungen
             for (let targetName of preferredVoiceNames) {
                 selectedVoice = voices.find(v => v.name.includes(targetName) && v.lang.startsWith('de'));
                 if (selectedVoice) {
-                    break; // Sobald die beste verfügbare Stimme gefunden wurde, Schleife abbrechen
+                    break;
                 }
             }
 
-            // Fallback: Wenn absolut keine Wunschstimme passt, nimm die erste deutsche Stimme
             if (!selectedVoice) {
                 selectedVoice = voices.find(v => v.lang.startsWith('de'));
             }
@@ -202,10 +280,9 @@
                 console.log("Ausgewählte Stimme für Leonardo: " + selectedVoice.name);
             }
             
-            msg.pitch = 0.82;  // Kräftig und tief für eine weise Ausstrahlung
-            msg.rate = 0.90;   // Etwas langsamer für museale Würde
+            msg.pitch = 0.82;
+            msg.rate = 0.90;
             
-            // Kleines Sicherheits-Timeout für flüssiges Umschalten in Edge
             setTimeout(() => { 
                 window.speechSynthesis.speak(msg); 
             }, 60);
@@ -219,6 +296,7 @@
                 window.speechSynthesis.speak(unlockMsg);
                 isAudioUnlocked = true;
             }
+
             window.speechSynthesis.resume();
             
             if (recognition) {
